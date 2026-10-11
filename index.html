@@ -200,7 +200,7 @@ dialog button.ok{background:var(--ac);border-color:var(--ac);color:#fff}
   function addVideo(){
     var vid=parseId(urlIn.value);
     if(!vid){err.textContent='No reconec aquest enllaç de YouTube.';return;}
-    videos.push({id:'v'+Date.now(),vid:vid,title:'Vídeo '+(videos.length+1),loop:false});
+    videos.push({id:'v'+Date.now(),vid:vid,title:'Vídeo '+(videos.length+1),loop:true});
     save();dlg.close();render();
     window.scrollTo({top:document.body.scrollHeight,behavior:'smooth'});
   }
