@@ -12,6 +12,8 @@
 body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}
 header{display:flex;gap:12px;align-items:center;padding:14px 18px;border-bottom:1px solid var(--bd)}
 h1{font-size:17px;margin:0;flex:1}
+.solo{display:flex;gap:6px;align-items:center;color:var(--mut);font-size:13px;cursor:pointer;user-select:none}
+.solo input{accent-color:var(--ac);width:16px;height:16px}
 #add{width:40px;height:40px;border-radius:50%;border:0;background:var(--ac);color:#fff;font-size:26px;line-height:1;cursor:pointer}
 #row{display:flex;flex-wrap:wrap;gap:16px;padding:18px;align-items:flex-start}
 .card{flex:0 0 min(420px,86vw);background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:12px}
@@ -50,7 +52,7 @@ dialog button.ok{background:var(--ac);border-color:var(--ac);color:#fff}
 </style>
 </head>
 <body>
-<header><h1>YouTube Loop Board</h1><button id="add" title="Afegeix un vídeo">+</button></header>
+<header><h1>YouTube Loop Board</h1><label class="solo"><input type="checkbox" id="solo" checked> Un sol vídeo alhora</label><button id="add" title="Afegeix un vídeo">+</button></header>
 <div id="row"></div>
 <div id="empty">Prem + i enganxa un enllaç de YouTube.</div>
 
@@ -127,6 +129,10 @@ dialog button.ok{background:var(--ac);border-color:var(--ac);color:#fff}
       card.append(top,box,ctl,vol); row.appendChild(card);
     });
   }
+  var solo=document.getElementById('solo');
+  try{solo.checked=localStorage.getItem('ytloop:solo')!=='0';}catch(e){}
+  solo.addEventListener('change',function(){try{localStorage.setItem('ytloop:solo',solo.checked?'1':'0');}catch(e){}});
+  function pauseOthers(id){Object.keys(players).forEach(function(k){if(k!==id){send(k,'pauseVideo');players[k].setPlaying(false);}});}
   var dragId=null;
   function clearMarks(){Object.keys(cards).forEach(function(k){cards[k].classList.remove('over-l','over-r');});}
   function applyOrder(){videos.forEach(function(v,i){if(cards[v.id])cards[v.id].style.order=i;});}
@@ -188,7 +194,7 @@ dialog button.ok{background:var(--ac);border-color:var(--ac);color:#fff}
     if(d.event==='onStateChange')st=d.info;
     else if(d.event==='infoDelivery'&&d.info&&typeof d.info.playerState==='number')st=d.info.playerState;
     if(st===null)return;
-    if(st===1)p.setPlaying(true);
+    if(st===1){p.setPlaying(true);if(solo.checked)pauseOthers(id);}
     else if(st===2||st===5||st===-1)p.setPlaying(false);
     else if(st===0){
       if(p.loop){send(id,'seekTo',[0,true]);send(id,'playVideo');p.setPlaying(true);}
