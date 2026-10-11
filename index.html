@@ -29,10 +29,10 @@ h1{font-size:17px;margin:0;flex:1}
 .mv{border:1px solid var(--bd);background:var(--bg);color:var(--fg);border-radius:6px;width:30px;height:30px;cursor:pointer;flex:0 0 30px}
 .mv:hover{border-color:var(--mut)}
 .grip{cursor:grab;color:var(--mut);padding:0 4px;user-select:none;font-size:18px}
-.handle{position:absolute;top:8px;left:50%;transform:translateX(-50%);z-index:2;padding:4px 14px;border-radius:999px;background:rgba(0,0,0,.7);color:#fff;font-size:13px;cursor:grab;user-select:none;border:1px solid rgba(255,255,255,.3)}
-.handle:hover{background:var(--ac);border-color:var(--ac)}
-.handle:active{cursor:grabbing}
-.card.drag{opacity:.4}
+.handle{flex:0 0 38px;height:38px;display:grid;place-items:center;font-size:24px;line-height:1;border-radius:8px;border:1px solid var(--bd);background:var(--bg);color:var(--mut);cursor:grab;user-select:none;-webkit-user-select:none;touch-action:none}
+.handle:hover,.handle:active{background:var(--ac);border-color:var(--ac);color:#fff}
+.card.drag{position:relative;z-index:50;box-shadow:0 12px 32px rgba(0,0,0,.7);opacity:.92}
+#row.dragging{user-select:none;-webkit-user-select:none}
 .card.over-l{box-shadow:-7px 0 0 var(--ac)}
 .card.over-r{box-shadow:7px 0 0 var(--ac)}
 #row.dragging iframe{pointer-events:none}
@@ -100,7 +100,6 @@ dialog button.ok{background:var(--ac);border-color:var(--ac);color:#fff}
       f.referrerPolicy='strict-origin-when-cross-origin';
       f.src='https://www.youtube.com/embed/'+v.vid+'?enablejsapi=1&rel=0&playsinline=1&origin='+encodeURIComponent(location.origin);
       box.appendChild(f);
-      var h=document.createElement('div'); h.className='handle'; h.textContent='\u283F  Mou'; h.title='Arrossega per moure el v\u00eddeo'; box.appendChild(h);
       players[v.id]={frame:f,loop:!!v.loop};
       function applyVol(){send(v.id,'setVolume',[v.vol]);}
       f.addEventListener('load',function(){listen(v.id);setTimeout(function(){listen(v.id);applyVol();},600);setTimeout(applyVol,1500);});
@@ -123,13 +122,8 @@ dialog button.ok{background:var(--ac);border-color:var(--ac);color:#fff}
       var ic=document.createElement('span'); ic.textContent='🔊'; ic.style.width='auto';
       vol.append(ic,vi,vl);
       var top=document.createElement('div'); top.className='top';
-      card.addEventListener('mousedown',function(e){card.draggable=!!e.target.closest('.handle');});
-      card.addEventListener('dragstart',function(e){dragId=v.id;card.classList.add('drag');row.classList.add('dragging');e.dataTransfer.effectAllowed='move';try{e.dataTransfer.setData('text/plain',v.id);}catch(x){}});
-      card.addEventListener('dragend',function(){card.draggable=false;dragId=null;row.classList.remove('dragging');card.classList.remove('drag');clearMarks();});
-      card.addEventListener('dragover',function(e){if(dragId&&dragId!==v.id){e.preventDefault();var r=card.getBoundingClientRect(),left=e.clientX<r.left+r.width/2;card.classList.toggle('over-l',left);card.classList.toggle('over-r',!left);}});
-      card.addEventListener('dragleave',function(){card.classList.remove('over-l','over-r');});
-      card.addEventListener('drop',function(e){e.preventDefault();var after=card.classList.contains('over-r');clearMarks();if(dragId&&dragId!==v.id)moveTo(dragId,v.id,after);});
-      top.append(t);
+      var h=document.createElement('div'); h.className='handle'; h.textContent='\u283F'; h.title='Arrossega per moure';
+      top.append(h,t);
       card.append(top,box,ctl,vol); row.appendChild(card);
     });
   }
@@ -145,10 +139,35 @@ dialog button.ok{background:var(--ac);border-color:var(--ac);color:#fff}
     videos.splice(after?b+1:b,0,it);
     applyOrder(); save();
   }
-  document.addEventListener('dragover',function(e){
-    if(!dragId)return;
-    if(e.clientY<90)window.scrollBy(0,-18); else if(e.clientY>window.innerHeight-90)window.scrollBy(0,18);
+  var drag=null;
+  row.addEventListener('pointerdown',function(e){
+    var h=e.target.closest('.handle'); if(!h)return;
+    var card=h.closest('.card'); e.preventDefault();
+    drag={id:card.dataset.id,card:card,pid:e.pointerId,sx:e.clientX,sy:e.clientY,sScroll:window.scrollY,tgt:null,after:false};
+    try{h.setPointerCapture(e.pointerId);}catch(x){}
+    card.classList.add('drag'); row.classList.add('dragging');
   });
+  row.addEventListener('pointermove',function(e){
+    if(!drag||e.pointerId!==drag.pid)return;
+    if(e.clientY<90)window.scrollBy(0,-14); else if(e.clientY>window.innerHeight-90)window.scrollBy(0,14);
+    drag.card.style.transform='translate('+(e.clientX-drag.sx)+'px,'+(e.clientY-drag.sy+window.scrollY-drag.sScroll)+'px)';
+    var tgt=null,after=false;
+    for(var i=0;i<videos.length;i++){
+      var id=videos[i].id; if(id===drag.id||!cards[id])continue;
+      var r=cards[id].getBoundingClientRect();
+      if(e.clientX>=r.left&&e.clientX<=r.right&&e.clientY>=r.top&&e.clientY<=r.bottom){tgt=id;after=e.clientX>r.left+r.width/2;break;}
+    }
+    clearMarks(); drag.tgt=tgt; drag.after=after;
+    if(tgt)cards[tgt].classList.add(after?'over-r':'over-l');
+  });
+  function endDrag(e){
+    if(!drag||e.pointerId!==drag.pid)return;
+    var d=drag; drag=null;
+    d.card.classList.remove('drag'); d.card.style.transform=''; row.classList.remove('dragging'); clearMarks();
+    if(e.type==='pointerup'&&d.tgt)moveTo(d.id,d.tgt,d.after);
+  }
+  row.addEventListener('pointerup',endDrag);
+  row.addEventListener('pointercancel',endDrag);
   function move(id,dir){
     var a=videos.findIndex(function(x){return x.id===id;}), b=a+dir;
     if(a<0||b<0||b>=videos.length)return;
