@@ -13,7 +13,7 @@ body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.4 system-ui,-appl
 header{display:flex;gap:12px;align-items:center;padding:14px 18px;border-bottom:1px solid var(--bd)}
 h1{font-size:17px;margin:0;flex:1}
 #add{width:40px;height:40px;border-radius:50%;border:0;background:var(--ac);color:#fff;font-size:26px;line-height:1;cursor:pointer}
-#row{display:flex;gap:16px;padding:18px;overflow-x:auto;align-items:flex-start}
+#row{display:flex;flex-wrap:wrap;gap:16px;padding:18px;align-items:flex-start}
 .card{flex:0 0 min(420px,86vw);background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:12px}
 .title{width:100%;border:1px solid transparent;background:transparent;color:var(--fg);font:600 15px system-ui,sans-serif;padding:6px 8px;border-radius:6px;margin-bottom:8px}
 .title:hover,.title:focus{border-color:var(--bd);outline:none}
@@ -30,7 +30,8 @@ h1{font-size:17px;margin:0;flex:1}
 .mv:hover{border-color:var(--mut)}
 .grip{cursor:grab;color:var(--mut);padding:0 4px;user-select:none;font-size:18px}
 .card.drag{opacity:.4}
-.card.over{outline:2px solid var(--ac)}
+.card.over-l{box-shadow:-7px 0 0 var(--ac)}
+.card.over-r{box-shadow:7px 0 0 var(--ac)}
 #row.dragging iframe{pointer-events:none}
 .vol{display:flex;align-items:center;gap:10px;margin-top:10px;color:var(--mut);font-size:13px}
 .vol input{flex:1;accent-color:var(--ac);min-width:0}
@@ -122,25 +123,32 @@ dialog button.ok{background:var(--ac);border-color:var(--ac);color:#fff}
       var bl=document.createElement('button'); bl.className='mv'; bl.textContent='\u25C0'; bl.title='Mou a l\u2019esquerra';
       var br=document.createElement('button'); br.className='mv'; br.textContent='\u25B6'; br.title='Mou a la dreta';
       bl.onclick=function(){move(v.id,-1);}; br.onclick=function(){move(v.id,1);};
-      grip.addEventListener('mousedown',function(){card.draggable=true;});
+      card.addEventListener('mousedown',function(e){card.draggable=!e.target.closest('input,button,iframe');});
       card.addEventListener('dragstart',function(e){dragId=v.id;card.classList.add('drag');row.classList.add('dragging');e.dataTransfer.effectAllowed='move';try{e.dataTransfer.setData('text/plain',v.id);}catch(x){}});
       card.addEventListener('dragend',function(){card.draggable=false;dragId=null;row.classList.remove('dragging');card.classList.remove('drag');clearMarks();});
-      card.addEventListener('dragover',function(e){if(dragId&&dragId!==v.id){e.preventDefault();card.classList.add('over');}});
-      card.addEventListener('dragleave',function(){card.classList.remove('over');});
-      card.addEventListener('drop',function(e){e.preventDefault();clearMarks();if(dragId&&dragId!==v.id)moveTo(dragId,v.id);});
+      card.addEventListener('dragover',function(e){if(dragId&&dragId!==v.id){e.preventDefault();var r=card.getBoundingClientRect(),left=e.clientX<r.left+r.width/2;card.classList.toggle('over-l',left);card.classList.toggle('over-r',!left);}});
+      card.addEventListener('dragleave',function(){card.classList.remove('over-l','over-r');});
+      card.addEventListener('drop',function(e){e.preventDefault();var after=card.classList.contains('over-r');clearMarks();if(dragId&&dragId!==v.id)moveTo(dragId,v.id,after);});
       top.append(grip,t,bl,br);
       card.append(top,box,ctl,vol); row.appendChild(card);
     });
   }
   var dragId=null;
-  function clearMarks(){Object.keys(cards).forEach(function(k){cards[k].classList.remove('over');});}
+  function clearMarks(){Object.keys(cards).forEach(function(k){cards[k].classList.remove('over-l','over-r');});}
   function applyOrder(){videos.forEach(function(v,i){if(cards[v.id])cards[v.id].style.order=i;});}
-  function moveTo(fromId,toId){
-    var a=videos.findIndex(function(x){return x.id===fromId;}), b=videos.findIndex(function(x){return x.id===toId;});
-    if(a<0||b<0)return;
-    var it=videos.splice(a,1)[0]; videos.splice(b,0,it);
+  function moveTo(fromId,toId,after){
+    var a=videos.findIndex(function(x){return x.id===fromId;});
+    if(a<0)return;
+    var it=videos.splice(a,1)[0];
+    var b=videos.findIndex(function(x){return x.id===toId;});
+    if(b<0){videos.splice(a,0,it);return;}
+    videos.splice(after?b+1:b,0,it);
     applyOrder(); save();
   }
+  document.addEventListener('dragover',function(e){
+    if(!dragId)return;
+    if(e.clientY<90)window.scrollBy(0,-18); else if(e.clientY>window.innerHeight-90)window.scrollBy(0,18);
+  });
   function move(id,dir){
     var a=videos.findIndex(function(x){return x.id===id;}), b=a+dir;
     if(a<0||b<0||b>=videos.length)return;
@@ -175,7 +183,7 @@ dialog button.ok{background:var(--ac);border-color:var(--ac);color:#fff}
     if(!vid){err.textContent='No reconec aquest enllaç de YouTube.';return;}
     videos.push({id:'v'+Date.now(),vid:vid,title:'Vídeo '+(videos.length+1),loop:false});
     save();dlg.close();render();
-    row.scrollLeft=row.scrollWidth;
+    window.scrollTo({top:document.body.scrollHeight,behavior:'smooth'});
   }
   document.getElementById('add').onclick=openDlg;
   document.getElementById('cancel').onclick=function(){dlg.close();};
