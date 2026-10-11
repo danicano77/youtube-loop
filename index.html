@@ -29,6 +29,9 @@ h1{font-size:17px;margin:0;flex:1}
 .mv{border:1px solid var(--bd);background:var(--bg);color:var(--fg);border-radius:6px;width:30px;height:30px;cursor:pointer;flex:0 0 30px}
 .mv:hover{border-color:var(--mut)}
 .grip{cursor:grab;color:var(--mut);padding:0 4px;user-select:none;font-size:18px}
+.handle{position:absolute;top:8px;left:50%;transform:translateX(-50%);z-index:2;padding:4px 14px;border-radius:999px;background:rgba(0,0,0,.7);color:#fff;font-size:13px;cursor:grab;user-select:none;border:1px solid rgba(255,255,255,.3)}
+.handle:hover{background:var(--ac);border-color:var(--ac)}
+.handle:active{cursor:grabbing}
 .card.drag{opacity:.4}
 .card.over-l{box-shadow:-7px 0 0 var(--ac)}
 .card.over-r{box-shadow:7px 0 0 var(--ac)}
@@ -97,6 +100,7 @@ dialog button.ok{background:var(--ac);border-color:var(--ac);color:#fff}
       f.referrerPolicy='strict-origin-when-cross-origin';
       f.src='https://www.youtube.com/embed/'+v.vid+'?enablejsapi=1&rel=0&playsinline=1&origin='+encodeURIComponent(location.origin);
       box.appendChild(f);
+      var h=document.createElement('div'); h.className='handle'; h.textContent='\u283F  Mou'; h.title='Arrossega per moure el v\u00eddeo'; box.appendChild(h);
       players[v.id]={frame:f,loop:!!v.loop};
       function applyVol(){send(v.id,'setVolume',[v.vol]);}
       f.addEventListener('load',function(){listen(v.id);setTimeout(function(){listen(v.id);applyVol();},600);setTimeout(applyVol,1500);});
@@ -119,17 +123,13 @@ dialog button.ok{background:var(--ac);border-color:var(--ac);color:#fff}
       var ic=document.createElement('span'); ic.textContent='🔊'; ic.style.width='auto';
       vol.append(ic,vi,vl);
       var top=document.createElement('div'); top.className='top';
-      var grip=document.createElement('span'); grip.className='grip'; grip.textContent='\u283F'; grip.title="Arrossega per canviar l'ordre";
-      var bl=document.createElement('button'); bl.className='mv'; bl.textContent='\u25C0'; bl.title='Mou a l\u2019esquerra';
-      var br=document.createElement('button'); br.className='mv'; br.textContent='\u25B6'; br.title='Mou a la dreta';
-      bl.onclick=function(){move(v.id,-1);}; br.onclick=function(){move(v.id,1);};
-      card.addEventListener('mousedown',function(e){card.draggable=!e.target.closest('input,button,iframe');});
+      card.addEventListener('mousedown',function(e){card.draggable=!!e.target.closest('.handle');});
       card.addEventListener('dragstart',function(e){dragId=v.id;card.classList.add('drag');row.classList.add('dragging');e.dataTransfer.effectAllowed='move';try{e.dataTransfer.setData('text/plain',v.id);}catch(x){}});
       card.addEventListener('dragend',function(){card.draggable=false;dragId=null;row.classList.remove('dragging');card.classList.remove('drag');clearMarks();});
       card.addEventListener('dragover',function(e){if(dragId&&dragId!==v.id){e.preventDefault();var r=card.getBoundingClientRect(),left=e.clientX<r.left+r.width/2;card.classList.toggle('over-l',left);card.classList.toggle('over-r',!left);}});
       card.addEventListener('dragleave',function(){card.classList.remove('over-l','over-r');});
       card.addEventListener('drop',function(e){e.preventDefault();var after=card.classList.contains('over-r');clearMarks();if(dragId&&dragId!==v.id)moveTo(dragId,v.id,after);});
-      top.append(grip,t,bl,br);
+      top.append(t);
       card.append(top,box,ctl,vol); row.appendChild(card);
     });
   }
