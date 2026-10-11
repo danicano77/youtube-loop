@@ -24,6 +24,9 @@ h1{font-size:17px;margin:0;flex:1}
 .ctl button:hover{border-color:var(--mut)}
 .ctl .loop.on{background:var(--on);border-color:var(--on);color:#fff}
 .ctl .del{flex:0 0 40px;color:var(--mut)}
+.vol{display:flex;align-items:center;gap:10px;margin-top:10px;color:var(--mut);font-size:13px}
+.vol input{flex:1;accent-color:var(--ac);min-width:0}
+.vol span{width:38px;text-align:right}
 #empty{color:var(--mut);padding:40px 18px}
 dialog{border:1px solid var(--bd);border-radius:12px;background:var(--card);color:var(--fg);padding:18px;width:min(460px,92vw)}
 dialog::backdrop{background:rgba(0,0,0,.45)}
@@ -75,6 +78,7 @@ dialog button.ok{background:var(--ac);border-color:var(--ac);color:#fff}
     empty.style.display=videos.length?'none':'block';
     videos.forEach(function(v){
       var card=document.createElement('div'); card.className='card';
+      if(typeof v.vol!=='number')v.vol=100;
       var t=document.createElement('input'); t.className='title'; t.value=v.title; t.title='Edita el títol';
       t.addEventListener('input',function(){v.title=t.value;save();});
       var box=document.createElement('div'); box.className='vid';
@@ -84,7 +88,8 @@ dialog button.ok{background:var(--ac);border-color:var(--ac);color:#fff}
       f.src='https://www.youtube.com/embed/'+v.vid+'?enablejsapi=1&rel=0&playsinline=1&origin='+encodeURIComponent(location.origin);
       box.appendChild(f);
       players[v.id]={frame:f,loop:!!v.loop};
-      f.addEventListener('load',function(){listen(v.id);setTimeout(function(){listen(v.id);},600);});
+      function applyVol(){send(v.id,'setVolume',[v.vol]);}
+      f.addEventListener('load',function(){listen(v.id);setTimeout(function(){listen(v.id);applyVol();},600);setTimeout(applyVol,1500);});
 
       var ctl=document.createElement('div'); ctl.className='ctl';
       var play=btn('▶ / ⏸'), stop=btn('⏹ Inici'), loop=btn('🔁 Loop'), del=btn('✕');
@@ -96,7 +101,14 @@ dialog button.ok{background:var(--ac);border-color:var(--ac);color:#fff}
       loop.onclick=function(){v.loop=!v.loop;players[v.id].loop=v.loop;loop.classList.toggle('on',v.loop);save();};
       del.onclick=function(){videos=videos.filter(function(x){return x.id!==v.id;});save();render();};
       ctl.append(play,stop,loop,del);
-      card.append(t,box,ctl); row.appendChild(card);
+      var vol=document.createElement('div'); vol.className='vol';
+      var vi=document.createElement('input'); vi.type='range'; vi.min=0; vi.max=100; vi.value=v.vol;
+      var vl=document.createElement('span'); vl.textContent=v.vol+'%';
+      vi.addEventListener('input',function(){v.vol=+vi.value;vl.textContent=v.vol+'%';applyVol();});
+      vi.addEventListener('change',save);
+      var ic=document.createElement('span'); ic.textContent='🔊'; ic.style.width='auto';
+      vol.append(ic,vi,vl);
+      card.append(t,box,ctl,vol); row.appendChild(card);
     });
   }
   function btn(txt){var b=document.createElement('button');b.textContent=txt;return b;}
