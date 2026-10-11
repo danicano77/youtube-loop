@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="ca">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>YouTube Loop Board</title>
+<style>
+:root{color-scheme:dark;--bg:#000;--card:#16161a;--fg:#ececf0;--mut:#8b8b95;--bd:#2c2c34;--ac:#e5322d;--on:#1f9d55;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#000;--card:#16161a;--fg:#ececf0;--mut:#8b8b95;--bd:#2c2c34}}
+:root[data-theme="dark"]{--bg:#000;--card:#16161a;--fg:#ececf0;--mut:#8b8b95;--bd:#2c2c34}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.4 system-ui,-apple-system,"Segoe UI",sans-serif}
+header{display:flex;gap:12px;align-items:center;padding:14px 18px;border-bottom:1px solid var(--bd)}
+h1{font-size:17px;margin:0;flex:1}
+#add{width:40px;height:40px;border-radius:50%;border:0;background:var(--ac);color:#fff;font-size:26px;line-height:1;cursor:pointer}
+#row{display:flex;gap:16px;padding:18px;overflow-x:auto;align-items:flex-start}
+.card{flex:0 0 min(420px,86vw);background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:12px}
+.title{width:100%;border:1px solid transparent;background:transparent;color:var(--fg);font:600 15px system-ui,sans-serif;padding:6px 8px;border-radius:6px;margin-bottom:8px}
+.title:hover,.title:focus{border-color:var(--bd);outline:none}
+.vid{position:relative;aspect-ratio:16/9;background:#000;border-radius:8px;overflow:hidden}
+.vid iframe{position:absolute;inset:0;width:100%;height:100%;border:0}
+.ctl{display:flex;gap:8px;margin-top:10px}
+.ctl button{flex:1;padding:9px 6px;border-radius:8px;border:1px solid var(--bd);background:var(--bg);color:var(--fg);font-size:14px;cursor:pointer}
+.ctl button:hover{border-color:var(--mut)}
+.ctl .loop.on{background:var(--on);border-color:var(--on);color:#fff}
+.ctl .del{flex:0 0 40px;color:var(--mut)}
+#empty{color:var(--mut);padding:40px 18px}
+dialog{border:1px solid var(--bd);border-radius:12px;background:var(--card);color:var(--fg);padding:18px;width:min(460px,92vw)}
+dialog::backdrop{background:rgba(0,0,0,.45)}
+dialog input{width:100%;padding:10px;border-radius:8px;border:1px solid var(--bd);background:var(--bg);color:var(--fg);font-size:15px}
+dialog .btns{display:flex;gap:8px;justify-content:flex-end;margin-top:12px}
+dialog button{padding:8px 14px;border-radius:8px;border:1px solid var(--bd);background:var(--bg);color:var(--fg);cursor:pointer}
+dialog button.ok{background:var(--ac);border-color:var(--ac);color:#fff}
+#err{color:var(--ac);font-size:13px;min-height:18px;margin-top:6px}
+</style>
+</head>
+<body>
+<header><h1>YouTube Loop Board</h1><button id="add" title="Afegeix un vídeo">+</button></header>
+<div id="row"></div>
+<div id="empty">Prem + i enganxa un enllaç de YouTube.</div>
+
+<dialog id="dlg">
+  <div style="font-weight:600;margin-bottom:10px">Enllaç del vídeo</div>
+  <input id="url" placeholder="https://www.youtube.com/watch?v=... o https://youtu.be/..." autocomplete="off">
+  <div id="err"></div>
+  <div class="btns"><button id="cancel">Cancel·la</button><button class="ok" id="ok">Afegeix</button></div>
+</dialog>
+
+<script>
+(function(){
+  var KEY='ytloop:v1', videos=[], players={}; // players[id] = {frame, loop, ready}
+  var row=document.getElementById('row'), empty=document.getElementById('empty');
+  var dlg=document.getElementById('dlg'), urlIn=document.getElementById('url'), err=document.getElementById('err');
+
+  function save(){try{localStorage.setItem(KEY,JSON.stringify(videos));}catch(e){}}
+  function load(){try{var s=localStorage.getItem(KEY);if(s)videos=JSON.parse(s)||[];}catch(e){videos=[];}}
+
+  function parseId(u){
+    u=(u||'').trim();
+    var m=u.match(/(?:youtu\.be\/|[?&]v=|\/embed\/|\/shorts\/|\/live\/)([\w-]{11})/);
+    if(m)return m[1];
+    return /^[\w-]{11}$/.test(u)?u:null;
+  }
+  function send(id,func,args){
+    var p=players[id]; if(!p||!p.frame.contentWindow)return;
+    p.frame.contentWindow.postMessage(JSON.stringify({event:'command',func:func,args:args||[]}),'*');
+  }
+  function listen(id){
+    var p=players[id]; if(!p||!p.frame.contentWindow)return;
+    p.frame.contentWindow.postMessage(JSON.stringify({event:'listening',id:id,channel:'widget'}),'*');
+  }
+
+  function render(){
+    row.innerHTML=''; players={};
+    empty.style.display=videos.length?'none':'block';
+    videos.forEach(function(v){
+      var card=document.createElement('div'); card.className='card';
+      var t=document.createElement('input'); t.className='title'; t.value=v.title; t.title='Edita el títol';
+      t.addEventListener('input',function(){v.title=t.value;save();});
+      var box=document.createElement('div'); box.className='vid';
+      var f=document.createElement('iframe');
+      f.allow='autoplay; encrypted-media; picture-in-picture; fullscreen'; f.allowFullscreen=true;
+      f.referrerPolicy='strict-origin-when-cross-origin';
+      f.src='https://www.youtube.com/embed/'+v.vid+'?enablejsapi=1&rel=0&playsinline=1&origin='+encodeURIComponent(location.origin);
+      box.appendChild(f);
+      players[v.id]={frame:f,loop:!!v.loop};
+      f.addEventListener('load',function(){listen(v.id);setTimeout(function(){listen(v.id);},600);});
+
+      var ctl=document.createElement('div'); ctl.className='ctl';
+      var play=btn('▶ / ⏸'), stop=btn('⏹ Inici'), loop=btn('🔁 Loop'), del=btn('✕');
+      loop.classList.add('loop'); del.classList.add('del'); del.title='Elimina';
+      if(v.loop)loop.classList.add('on');
+      var playing=false; players[v.id].setPlaying=function(s){playing=s;};
+      play.onclick=function(){send(v.id,playing?'pauseVideo':'playVideo');playing=!playing;};
+      stop.onclick=function(){send(v.id,'seekTo',[0,true]);send(v.id,'pauseVideo');playing=false;};
+      loop.onclick=function(){v.loop=!v.loop;players[v.id].loop=v.loop;loop.classList.toggle('on',v.loop);save();};
+      del.onclick=function(){videos=videos.filter(function(x){return x.id!==v.id;});save();render();};
+      ctl.append(play,stop,loop,del);
+      card.append(t,box,ctl); row.appendChild(card);
+    });
+  }
+  function btn(txt){var b=document.createElement('button');b.textContent=txt;return b;}
+
+  // Events coming from the YouTube iframes
+  window.addEventListener('message',function(e){
+    if(e.origin.indexOf('youtube.com')<0)return;
+    var d; try{d=typeof e.data==='string'?JSON.parse(e.data):e.data;}catch(x){return;}
+    if(!d||!d.event)return;
+    var id=Object.keys(players).filter(function(k){return players[k].frame.contentWindow===e.source;})[0];
+    if(!id)return;
+    var p=players[id], st=null;
+    if(d.event==='onStateChange')st=d.info;
+    else if(d.event==='infoDelivery'&&d.info&&typeof d.info.playerState==='number')st=d.info.playerState;
+    if(st===null)return;
+    if(st===1)p.setPlaying(true);
+    else if(st===2||st===5||st===-1)p.setPlaying(false);
+    else if(st===0){
+      if(p.loop){send(id,'seekTo',[0,true]);send(id,'playVideo');p.setPlaying(true);}
+      else p.setPlaying(false);
+    }
+  });
+
+  function openDlg(){urlIn.value='';err.textContent='';dlg.showModal();urlIn.focus();}
+  function addVideo(){
+    var vid=parseId(urlIn.value);
+    if(!vid){err.textContent='No reconec aquest enllaç de YouTube.';return;}
+    videos.push({id:'v'+Date.now(),vid:vid,title:'Vídeo '+(videos.length+1),loop:false});
+    save();dlg.close();render();
+    row.scrollLeft=row.scrollWidth;
+  }
+  document.getElementById('add').onclick=openDlg;
+  document.getElementById('cancel').onclick=function(){dlg.close();};
+  document.getElementById('ok').onclick=addVideo;
+  urlIn.addEventListener('keydown',function(e){if(e.key==='Enter')addVideo();});
+
+  load();render();
+})();
+</script>
+</body>
+</html>
